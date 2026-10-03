@@ -6,6 +6,7 @@ import { useDispatch } from "react-redux";
 import { addCart } from "../redux/action";
 
 import { Footer, Navbar } from "../components";
+import { getProduct, getProductsByCategory, formatCategory } from "../api/products";
 
 const Product = () => {
   const { id } = useParams();
@@ -21,21 +22,17 @@ const Product = () => {
   };
 
   useEffect(() => {
-    const getProduct = async () => {
+    const loadProduct = async () => {
       setLoading(true);
       setLoading2(true);
-      const response = await fetch(`https://fakestoreapi.com/products/${id}`);
-      const data = await response.json();
+      const data = await getProduct(id);
       setProduct(data);
       setLoading(false);
-      const response2 = await fetch(
-        `https://fakestoreapi.com/products/category/${data.category}`
-      );
-      const data2 = await response2.json();
-      setSimilarProducts(data2);
+      const data2 = await getProductsByCategory(data.category, 11);
+      setSimilarProducts(data2.filter((item) => item.id !== data.id));
       setLoading2(false);
     };
-    getProduct();
+    loadProduct();
   }, [id]);
 
   const Loading = () => {
@@ -76,7 +73,9 @@ const Product = () => {
               />
             </div>
             <div className="col-md-6 col-md-6 py-5">
-              <h4 className="text-uppercase text-muted">{product.category}</h4>
+              <h4 className="text-uppercase text-muted">
+                {formatCategory(product.category)}
+              </h4>
               <h1 className="display-5">{product.title}</h1>
               <p className="lead">
                 {product.rating && product.rating.rate}{" "}
@@ -140,7 +139,7 @@ const Product = () => {
                   />
                   <div className="card-body">
                     <h5 className="card-title">
-                      {item.title.substring(0, 15)}...
+                      {item.title.substring(0, 24)}...
                     </h5>
                   </div>
                   {/* <ul className="list-group list-group-flush">
