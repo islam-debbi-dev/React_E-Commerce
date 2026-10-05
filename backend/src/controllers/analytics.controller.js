@@ -3,6 +3,8 @@ import Order, { toClientOrder } from "../models/Order.js";
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import { asyncHandler } from "../lib/errors.js";
+import { titleFromSlug } from "../models/Category.js";
+import { LOW_STOCK_THRESHOLD } from "./products.controller.js";
 
 const round = (value) => Math.round(Number(value) * 100) / 100;
 
@@ -168,6 +170,83 @@ export const getOverview = asyncHandler(async (req, res) => {
       revenue: round(row.revenue),
     })),
     recentOrders: recentOrders.map(toClientOrder),
+    generatedAt: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1,
+  });
+});
+export const getProductStats = asyncHandler(async (req, res) => {
+  const [totals, categoryCount, categoryRows] = await Promise.all([
+    Product.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          inStock: { $sum: { $cond: [{ $gt: ["$stock", 0] }, 1, 0] } },
+          outOfStock: { $sum: { $cond: [{ $eq: ["$stock", 0] }, 1, 0] } },
+          lowStock: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $gt: ["$stock", 0] },
+                    { $lte: ["$stock", LOW_STOCK_THRESHOLD] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          discounted: { $sum: { $cond: [{ $gt: ["$discountPercentage", 0] }, 1, 0] } },
+          units: { $sum: "$stock" },
+          inventoryValue: { $sum: { $multiply: ["$price", "$stock"] } },
+          averagePrice: { $avg: "$price" },
+          averageRating: { $avg: "$rating.rate" },
+          maxPrice: { $max: "$price" },
+        },
+      },
+    ]),
+    Category.countDocuments(),
+    Product.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          units: { $sum: "$stock" },
+          value: { $sum: { $multiply: ["$price", "$stock"] } },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 6 },
+    ]),
+  ]);
+
+  const stats = totals[0] ?? {};
+
+  res.json({
+    code: "SUCCESS",
+    message: "Product statistics",
+    totals: {
+      total: stats.total ?? 0,
+      categories: categoryCount,
+      inStock: stats.inStock ?? 0,
+      outOfStock: stats.outOfStock ?? 0,
+      lowStock: stats.lowStock ?? 0,
+      discounted: stats.discounted ?? 0,
+      units: stats.units ?? 0,
+      inventoryValue: round(stats.inventoryValue ?? 0),
+      averagePrice: round(stats.averagePrice ?? 0),
+      averageRating: Math.round((stats.averageRating ?? 0) * 10) / 10,
+      maxPrice: round(stats.maxPrice ?? 0),
+    },
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
+    topCategories: categoryRows.map((row) => ({
+      category: row._id,
+      title: titleFromSlug(row._id),
+      count: row.count,
+      units: row.units,
+      value: round(row.value),
+    })),
     generatedAt: new Date().toISOString(),
     db: mongoose.connection.readyState === 1,
   });

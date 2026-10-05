@@ -25,6 +25,29 @@ const uploadAll = async (req, folder) => {
   return uploaded;
 };
 
+const readNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const SORTS = {
+  newest: { createdAt: -1 },
+  oldest: { createdAt: 1 },
+  price_asc: { price: 1 },
+  price_desc: { price: -1 },
+  rating_desc: { "rating.rate": -1 },
+  rating_asc: { "rating.rate": 1 },
+};
+
+/** A product with this many units or fewer is reported as "low stock". */
+export const LOW_STOCK_THRESHOLD = 5;
+
+const STOCK_FILTERS = {
+  in: { $gt: 0 },
+  out: { $eq: 0 },
+  low: { $gt: 0, $lte: LOW_STOCK_THRESHOLD },
+};
+
 export const listProducts = asyncHandler(async (req, res) => {
   const page = Math.max(Number(req.query.page) || 1, 1);
   const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 200);
@@ -39,13 +62,36 @@ export const listProducts = asyncHandler(async (req, res) => {
     filter.$or = [{ title: pattern }, { description: pattern }, { brand: pattern }];
   }
 
-  const [products, total] = await Promise.all([
+  const minPrice = readNumber(req.query.minPrice);
+  const maxPrice = readNumber(req.query.maxPrice);
+  if (minPrice !== undefined || maxPrice !== undefined) {
+    filter.price = {};
+    if (minPrice !== undefined) filter.price.$gte = minPrice;
+    if (maxPrice !== undefined) filter.price.$lte = maxPrice;
+  }
+
+  const minRating = readNumber(req.query.minRating);
+  if (minRating !== undefined) {
+    filter["rating.rate"] = { $gte: minRating };
+  }
+
+  const stockFilter = STOCK_FILTERS[String(req.query.stock ?? "").trim().toLowerCase()];
+  if (stockFilter) {
+    filter.stock = stockFilter;
+  }
+
+  const sort = SORTS[req.query.sort] ?? SORTS.newest;
+
+  const [products, total, bounds] = await Promise.all([
     Product.find(filter)
-      .sort({ createdAt: -1 })
+      .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
     Product.countDocuments(filter),
+    Product.aggregate([
+      { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } },
+    ]),
   ]);
 
   res.json({
@@ -54,6 +100,11 @@ export const listProducts = asyncHandler(async (req, res) => {
     page,
     limit,
     totalPages: Math.max(Math.ceil(total / limit), 1),
+    sort: req.query.sort && SORTS[req.query.sort] ? req.query.sort : "newest",
+    priceRange: {
+      min: bounds[0]?.min ?? 0,
+      max: bounds[0]?.max ?? 0,
+    },
   });
 });
 

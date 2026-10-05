@@ -17,12 +17,6 @@ export default function TablePagination({
   setPage,
   totalPages,
 }: TablePaginationProps) {
-  console.log(
-    "TablePagination rendered with page:",
-    page,
-    "totalPages:",
-    totalPages,
-  );
   const getPageNumbers = () => {
     if (totalPages <= 3) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -36,7 +30,6 @@ export default function TablePagination({
 
   const pageNumbers = getPageNumbers();
 
-  console.log("Page numbers:", pageNumbers);
 
   return (
     <Pagination dir="ltr">

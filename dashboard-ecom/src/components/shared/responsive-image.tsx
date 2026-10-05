@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 export default function ResponsiveImage({
   src,
@@ -17,17 +17,6 @@ export default function ResponsiveImage({
   aspectRatio?: string;
 }) {
   const [loading, setLoading] = useState(true);
-  const imgRef = useRef<HTMLImageElement | null>(null);
-
-  console.log(
-    "width: ",
-    width,
-    " height: ",
-    height,
-    " aspectRatio: ",
-    aspectRatio,
-  );
-
   return (
     <div
       className={`relative  ${
@@ -38,7 +27,6 @@ export default function ResponsiveImage({
         <source srcSet={`${src}?format=avif&size=${size}`} type="image/avif" />
         <source srcSet={`${src}?format=webp&size=${size}`} type="image/webp" />
         <img
-          ref={imgRef}
           src={`${src}?size=${size}`}
           alt={alt || ""}
           className={cn(

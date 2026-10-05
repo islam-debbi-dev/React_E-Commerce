@@ -21,6 +21,16 @@ const nextConfig = {
         hostname: "cdn.dummyjson.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "fastly.picsum.photos",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
+        pathname: "/**",
+      },
     ],
   },
   experimental: {

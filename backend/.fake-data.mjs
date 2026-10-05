@@ -93,30 +93,37 @@ const remoteProducts = async () => {
   }));
 };
 
-const uploadToCloudinary = async (url) => {
-  const response = await fetch(url);
+const uploadToCloudinary = async (url, folder) => {
+  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
   if (!response.ok) {
     throw new Error(`photo download failed: ${url} (${response.status})`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
-  return uploadImage({ buffer, mimetype: "image/jpeg", originalname: `${url.split("/").pop()}.jpg` }, "ecommerce/products");
+  return uploadImage({ buffer, mimetype: "image/jpeg", originalname: `${url.split("/").pop()}.jpg` }, folder);
 };
 
 const cloudinaryProducts = async () => {
   const docs = [];
   for (const item of CLOUDINARY_PRODUCTS) {
-    const { url, publicId } = await uploadToCloudinary(item.photo, item.category);
     const { photo, ...rest } = item;
-    docs.push({
+    const base = {
       ...rest,
       discountPercentage: 0,
       rating: { rate: Number((3.8 + Math.random() * 1.2).toFixed(1)), count: 1 + Math.floor(Math.random() * 40) },
-      image: url,
-      images: [url],
-      cloudinaryIds: [publicId],
       source: "fake-cloudinary",
-    });
-    console.log(`[fake-data] uploaded ${rest.title} -> ${url}`);
+    };
+
+    // The photo CDN is occasionally unreachable from a sandbox, so a failed
+    // upload must not abort the whole seed.
+    try {
+      const { url, publicId } = await uploadToCloudinary(photo, "ecommerce/products");
+      docs.push({ ...base, image: url, images: [url], cloudinaryIds: [publicId] });
+      console.log(`[fake-data] uploaded ${rest.title} -> ${url}`);
+    } catch (error) {
+      const fallback = `https://placehold.co/1200x1200/png?text=${encodeURIComponent(rest.title)}`;
+      docs.push({ ...base, image: fallback, images: [fallback], cloudinaryIds: [] });
+      console.warn(`[fake-data] skipped photo for ${rest.title}: ${error.cause?.code || error.message}`);
+    }
   }
   return docs;
 };

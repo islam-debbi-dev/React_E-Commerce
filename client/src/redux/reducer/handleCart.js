@@ -4,6 +4,10 @@ const getInitialCart = () => {
   return storedCart ? JSON.parse(storedCart) : [];
 };
 
+const persist = (cart) => {
+  localStorage.setItem("cart", JSON.stringify(cart));
+};
+
 const handleCart = (state = getInitialCart(), action) => {
   const product = action.payload;
   let updatedCart;
@@ -20,12 +24,12 @@ const handleCart = (state = getInitialCart(), action) => {
       } else {
         updatedCart = [...state, { ...product, qty: 1 }];
       }
-      // Update localStorage
-      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      persist(updatedCart);
       return updatedCart;
 
     case "DELITEM":
       const exist2 = state.find((x) => x.id === product.id);
+      if (!exist2) return state;
       if (exist2.qty === 1) {
         updatedCart = state.filter((x) => x.id !== exist2.id);
       } else {
@@ -33,9 +37,22 @@ const handleCart = (state = getInitialCart(), action) => {
           x.id === product.id ? { ...x, qty: x.qty - 1 } : x
         );
       }
-      // Update localStorage
-      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      persist(updatedCart);
       return updatedCart;
+
+    case "REMOVEITEM":
+      updatedCart = state.filter((x) => x.id !== product.id);
+      persist(updatedCart);
+      return updatedCart;
+
+    case "SETQTY": {
+      const qty = Math.max(Number(product.qty) || 1, 1);
+      updatedCart = state.map((x) =>
+        x.id === product.id ? { ...x, qty: Math.min(qty, 99) } : x
+      );
+      persist(updatedCart);
+      return updatedCart;
+    }
 
     case "CLEARITEM":
       localStorage.removeItem("cart");
@@ -44,7 +61,7 @@ const handleCart = (state = getInitialCart(), action) => {
     case "PRUNEITEMS":
       const stale = new Set(action.payload);
       updatedCart = state.filter((x) => !stale.has(x.id));
-      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      persist(updatedCart);
       return updatedCart;
 
     default:

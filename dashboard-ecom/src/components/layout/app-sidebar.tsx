@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { IconChartBar } from "@tabler/icons-react";
-import { ShoppingBag } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag } from "lucide-react";
 import { useState } from "react";
 
 import { NavMain } from "@/components/layout/nav-main";
@@ -22,7 +21,12 @@ const data = {
     {
       title: "Overview",
       url: "/dashboard/overview",
-      icon: IconChartBar,
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Products",
+      url: "/dashboard/products",
+      icon: Package,
     },
   ],
 };

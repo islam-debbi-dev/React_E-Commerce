@@ -1,8 +1,9 @@
 import { request } from "./products";
 
-export const createOrder = async (order) => {
-  return request("/orders", {
+/** Returns the full creation response: { order, whatsappUrl, telegramSent, telegramError } */
+export const createOrder = async (payload) =>
+  request("/api/orders", {
     method: "POST",
-    body: JSON.stringify(order),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-};

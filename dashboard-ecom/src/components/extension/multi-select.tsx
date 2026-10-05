@@ -189,7 +189,7 @@ const MultiSelector = ({
           break;
       }
     },
-    [value, activeIndex, loop],
+    [value, activeIndex, loop, dir, onValueChangeHandler, open],
   );
 
   return (

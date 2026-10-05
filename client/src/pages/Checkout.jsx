@@ -1,317 +1,476 @@
-import React, { useState } from "react";
-import { Footer, Navbar } from "../components";
-import { useSelector, useDispatch } from "react-redux";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import toast from "react-hot-toast";
-import { createOrder } from "../api/orders";
-import { clearCart } from "../redux/action";
-import { usePruneCart } from "../hooks/usePruneCart";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  ArrowLeft,
+  Check,
+  CircleCheck,
+  ClipboardCheck,
+  Loader2,
+  MessageCircle,
+  Package,
+  Send,
+  Truck,
+} from "lucide-react";
+import { toast } from "sonner";
 
-const SHIPPING = 30;
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import EmptyState from "@/components/empty-state";
+import SuccessPanel from "@/components/checkout/success-panel";
 
-const EmptyCart = () => {
-  return (
-    <div className="container">
-      <div className="row">
-        <div className="col-md-12 py-5 bg-light text-center">
-          <h4 className="p-3 display-5">No item in Cart</h4>
-          <Link to="/" className="btn btn-outline-dark mx-4">
-            <i className="fa fa-arrow-left"></i> Continue Shopping
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { useDispatch } from "react-redux";
+import { clearCart } from "@/redux/action";
+import { useCart, currency } from "@/hooks/use-cart";
+import { usePruneCart } from "@/hooks/use-prune-cart";
+import { createOrder } from "@/api/orders";
 
-const Summary = ({ items, totalItems, subtotal }) => {
-  return (
-    <div className="col-md-5 col-lg-4 order-md-last">
-      <div className="card mb-4">
-        <div className="card-header py-3 bg-light">
-          <h5 className="mb-0">Order Summary</h5>
-        </div>
-        <div className="card-body">
-          <ul className="list-group list-group-flush">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="list-group-item d-flex justify-content-between align-items-center border-0 px-0"
-              >
-                <span>
-                  {item.title} <small className="text-muted">x {item.qty}</small>
-                </span>
-                <span>${Math.round(item.price * item.qty)}</span>
-              </li>
-            ))}
-            <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 pb-0">
-              Products ({totalItems})<span>${Math.round(subtotal)}</span>
-            </li>
-            <li className="list-group-item d-flex justify-content-between align-items-center px-0">
-              Shipping
-              <span>${SHIPPING}</span>
-            </li>
-            <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 mb-3">
-              <div>
-                <strong>Total amount</strong>
-              </div>
-              <span>
-                <strong>${Math.round(subtotal + SHIPPING)}</strong>
-              </span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-};
+const steps = [
+  { id: "details", label: "Details", icon: ClipboardCheck },
+  { id: "delivery", label: "Delivery", icon: Truck },
+  { id: "confirm", label: "Confirm", icon: CircleCheck },
+];
 
-const Details = ({
-  customer,
-  onChange,
-  sending,
-  placedOrder,
-  whatsappUrl,
-  onTelegram,
-  onWhatsApp,
-  onReset,
-}) => {
-  return (
-    <div className="col-md-7 col-lg-8">
-      <div className="card mb-4">
-        <div className="card-header py-3">
-          <h4 className="mb-0">Your details</h4>
-        </div>
-        <div className="card-body">
-          <form onSubmit={onTelegram} autoComplete="on">
-            <div className="row g-3">
-              <div className="col-sm-6 my-1">
-                <label htmlFor="name" className="form-label">
-                  Full name
-                </label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="name"
-                  name="name"
-                  placeholder="Jane Doe"
-                  value={customer.name}
-                  onChange={onChange}
-                  required
-                />
-              </div>
+const schema = z.object({
+  name: z.string().min(2, "Please enter your full name"),
+  phone: z
+    .string()
+    .min(6, "Please enter your phone number")
+    .regex(/^[+\d][\d\s()-]{6,}$/, "Use digits, spaces, + or - only"),
+  address: z.string().max(160, "Address is too long").optional(),
+  note: z.string().max(280, "Note is too long").optional(),
+});
 
-              <div className="col-sm-6 my-1">
-                <label htmlFor="phone" className="form-label">
-                  Phone number
-                </label>
-                <input
-                  type="tel"
-                  className="form-control"
-                  id="phone"
-                  name="phone"
-                  placeholder="+213 676 903 083"
-                  value={customer.phone}
-                  onChange={onChange}
-                  required
-                />
-              </div>
-
-              <div className="col-12 my-1">
-                <label htmlFor="address" className="form-label">
-                  Delivery address
-                </label>
-                <input
-                  type="text"
-                  className="form-control"
-                  id="address"
-                  name="address"
-                  placeholder="City, street, building"
-                  value={customer.address}
-                  onChange={onChange}
-                />
-              </div>
-
-              <div className="col-12 my-1">
-                <label htmlFor="note" className="form-label">
-                  Note for the shop{" "}
-                  <span className="text-muted">(Optional)</span>
-                </label>
-                <textarea
-                  className="form-control"
-                  id="note"
-                  name="note"
-                  rows="3"
-                  placeholder="Call me before delivery"
-                  value={customer.note}
-                  onChange={onChange}
-                ></textarea>
-              </div>
-            </div>
-
-            <hr className="my-4" />
-
-            <h4 className="mb-3">Send your order</h4>
-            <p className="text-muted">
-              No card needed. Pick how you want to send the order details, we
-              receive them instantly.
-            </p>
-
-            {placedOrder && (
-              <div className="alert alert-success" role="alert">
-                Order <strong>{placedOrder.orderNumber}</strong> saved, total $
-                {Math.round(placedOrder.total)} ({placedOrder.itemCount} items).
-              </div>
-            )}
-
-            <div className="row">
-              <div className="col-md-6 mb-2">
-                <button
-                  type="button"
-                  className="w-100 btn btn-success"
-                  disabled={Boolean(sending)}
-                  onClick={onWhatsApp}
-                >
-                  <i className="fa fa-whatsapp mr-2"></i>
-                  {sending === "whatsapp" ? "Opening WhatsApp..." : "Order on WhatsApp"}
-                </button>
-              </div>
-              <div className="col-md-6 mb-2">
-                <button
-                  type="submit"
-                  className="w-100 btn btn-info"
-                  disabled={Boolean(sending)}
-                >
-                  <i className="fa fa-paper-plane mr-2"></i>
-                  {sending === "telegram" ? "Sending..." : "Order on Telegram"}
-                </button>
-              </div>
-            </div>
-
-            {whatsappUrl && (
-              <div className="alert alert-warning mt-3" role="alert">
-                Your browser blocked the WhatsApp tab.{" "}
-                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  Open the WhatsApp order
-                </a>{" "}
-                to finish sending it.
-              </div>
-            )}
-
-            {placedOrder && (
-              <button type="button" className="btn btn-outline-secondary w-100 mt-2" onClick={onReset}>
-                Start a new order
-              </button>
-            )}
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const Checkout = () => {
-  const state = useSelector((state) => state.handleCart);
+export default function Checkout() {
   const dispatch = useDispatch();
+  const { items, itemCount, subtotal, shipping, total, isEmpty } = useCart();
+  usePruneCart(items);
 
-  const [customer, setCustomer] = useState({ name: "", phone: "", address: "", note: "" });
-  const [sending, setSending] = useState("");
-  const [placedOrder, setPlacedOrder] = useState(null);
-  const [whatsappUrl, setWhatsappUrl] = useState("");
+  const [step, setStep] = useState(0);
+  const [channel, setChannel] = useState("telegram");
+  const [placing, setPlacing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [copied, setCopied] = useState(false);
 
-  usePruneCart(state);
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    getValues,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { name: "", phone: "", address: "", note: "" },
+    mode: "onBlur",
+  });
 
-  const updateField = (event) => {
-    const { name, value } = event.target;
-    setCustomer((previous) => ({ ...previous, [name]: value }));
+  const goToDelivery = async () => {
+    const valid = await trigger(["name", "phone"]);
+    if (valid) {
+      setStep(1);
+      toast.success("Details saved");
+    }
   };
 
-  const placeOrder = async (channel) => {
-    if (!customer.name.trim() || !customer.phone.trim()) {
-      toast.error("Name and phone number are required");
-      return;
+  const placeOrder = async (values) => {
+    if (placing) return;
+    setPlacing(true);
+
+    // Opened synchronously so the browser never blocks it as a popup.
+    let waTab = null;
+    if (channel === "whatsapp") {
+      waTab = window.open("", "_blank");
     }
 
-    const tab = channel === "whatsapp" ? window.open("", "_blank") : null;
-
-    setSending(channel);
     try {
       const data = await createOrder({
-        name: customer.name.trim(),
-        phone: customer.phone.trim(),
-        address: customer.address.trim(),
-        note: customer.note.trim(),
+        items: items.map((item) => ({ id: item.id, qty: item.qty })),
+        name: values.name.trim(),
+        phone: values.phone.trim(),
+        address: (values.address ?? "").trim(),
+        note: (values.note ?? "").trim(),
         channel,
-        items: state.map((item) => ({ id: item.id, qty: item.qty })),
       });
 
-      setPlacedOrder(data.order);
-
-      if (channel === "whatsapp") {
-        if (tab && !tab.closed) {
-          tab.location.href = data.whatsappUrl;
-          toast.success("WhatsApp opened, press send to confirm your order");
+      if (channel === "whatsapp" && data.whatsappUrl) {
+        if (waTab && !waTab.closed) {
+          waTab.location.href = data.whatsappUrl;
         } else {
-          setWhatsappUrl(data.whatsappUrl);
-          toast("WhatsApp tab was blocked, use the link below", { icon: "⚠️" });
+          waTab?.close();
+          const opened = window.open(data.whatsappUrl, "_blank", "noopener");
+          if (!opened) {
+            toast.warning("WhatsApp was blocked, use the link on the next screen");
+          }
         }
-      } else if (data.telegramSent) {
-        toast.success(`Order ${data.order.orderNumber} sent to Telegram`);
       } else {
-        toast.error(`Order saved, but Telegram push failed: ${data.telegramError}`);
+        waTab?.close();
       }
+
+      if (channel === "telegram") {
+        if (data.telegramSent) {
+          toast.success(`Order ${data.order.orderNumber} sent to Telegram`);
+        } else {
+          toast.error(`Order saved, but the Telegram push failed: ${data.telegramError}`);
+        }
+      }
+
+      dispatch(clearCart());
+      setResult({
+        order: data.order,
+        whatsappUrl: data.whatsappUrl,
+        channel,
+        tabBlocked: channel === "whatsapp" && !waTab,
+      });
+      setStep(2);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
-      if (tab && !tab.closed) {
-        tab.close();
-      }
-      toast.error(error.message);
+      waTab?.close();
+      toast.error("Could not place the order", { description: error.message });
+      setStep(0);
     } finally {
-      setSending("");
+      setPlacing(false);
     }
   };
 
-  const reset = () => {
-    dispatch(clearCart());
-    setPlacedOrder(null);
-    setWhatsappUrl("");
-    setCustomer({ name: "", phone: "", address: "", note: "" });
-  };
+  if (result) {
+    return (
+      <div className="mx-auto w-full max-w-2xl px-4 py-12">
+        <SuccessPanel result={result} copied={copied} onCopy={setCopied} />
+      </div>
+    );
+  }
 
-  const subtotal = state.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const totalItems = state.reduce((sum, item) => sum + item.qty, 0);
+  if (isEmpty) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-16">
+        <EmptyState
+          icon={Package}
+          title="Nothing to check out"
+          description="Your cart is empty. Add a product and come back to place your order."
+          actionLabel="Browse products"
+          actionTo="/product"
+        />
+      </div>
+    );
+  }
+
+  const values = getValues();
 
   return (
-    <>
-      <Navbar />
-      <div className="container my-3 py-3">
-        <h1 className="text-center">Checkout</h1>
-        <hr />
-        {state.length ? (
-          <div className="container py-5">
-            <div className="row my-4">
-              <Summary items={state} totalItems={totalItems} subtotal={subtotal} />
-              <Details
-                customer={customer}
-                onChange={updateField}
-                sending={sending}
-                placedOrder={placedOrder}
-                whatsappUrl={whatsappUrl}
-                onTelegram={(event) => {
-                  event.preventDefault();
-                  placeOrder("telegram");
-                }}
-                onWhatsApp={() => placeOrder("whatsapp")}
-                onReset={reset}
-              />
-            </div>
-          </div>
-        ) : (
-          <EmptyCart />
-        )}
-      </div>
-      <Footer />
-    </>
-  );
-};
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <header className="mb-6 flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Checkout</h1>
+        <p className="text-sm text-muted-foreground">
+          {itemCount} {itemCount === 1 ? "item" : "items"} · {currency(total)}
+        </p>
+      </header>
 
-export default Checkout;
+      <CheckoutSteps current={step} />
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
+        <div>
+          {step === 0 && (
+            <Card>
+              <CardContent className="space-y-5 p-5">
+                <div className="space-y-1">
+                  <h2 className="font-semibold">Your details</h2>
+                  <p className="text-sm text-muted-foreground">
+                    We only use these to confirm the order.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Islam Debbi"
+                    autoComplete="name"
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby="name-error"
+                    {...register("name")}
+                  />
+                  <FieldError id="name-error" message={errors.name?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+213 6 00 00 00 00"
+                    autoComplete="tel"
+                    aria-invalid={Boolean(errors.phone)}
+                    aria-describedby="phone-error"
+                    {...register("phone")}
+                  />
+                  <FieldError id="phone-error" message={errors.phone?.message} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">
+                    Delivery address{" "}
+                    <span className="font-normal text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id="address"
+                    placeholder="Street, city"
+                    autoComplete="street-address"
+                    {...register("address")}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="note">
+                    Note{" "}
+                    <span className="font-normal text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Textarea
+                    id="note"
+                    rows={3}
+                    placeholder="When should we deliver?"
+                    {...register("note")}
+                  />
+                </div>
+
+                <div className="flex flex-wrap justify-between gap-3 pt-1">
+                  <Button asChild variant="ghost" className="text-muted-foreground">
+                    <Link to="/cart">
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to cart
+                    </Link>
+                  </Button>
+                  <Button onClick={goToDelivery} className="min-w-36 gap-2">
+                    Continue
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {step === 1 && (
+            <Card>
+              <CardContent className="space-y-5 p-5">
+                <div className="space-y-1">
+                  <h2 className="font-semibold">How should we confirm?</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Pick a channel. Both send the same order summary to the shop.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ChannelCard
+                    active={channel === "telegram"}
+                    onClick={() => setChannel("telegram")}
+                    icon={Send}
+                    title="Telegram"
+                    description="Order is sent to the shop bot right away."
+                  />
+                  <ChannelCard
+                    active={channel === "whatsapp"}
+                    onClick={() => setChannel("whatsapp")}
+                    icon={MessageCircle}
+                    title="WhatsApp"
+                    description="Opens a chat with the prefilled order."
+                  />
+                </div>
+
+                <dl className="space-y-1 rounded-md bg-muted/50 p-4 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Name</dt>
+                    <dd className="truncate font-medium">{values.name}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Phone</dt>
+                    <dd className="font-medium">{values.phone}</dd>
+                  </div>
+                  {values.address && (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Address</dt>
+                      <dd className="truncate font-medium">{values.address}</dd>
+                    </div>
+                  )}
+                  {values.note && (
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Note</dt>
+                      <dd className="truncate font-medium">{values.note}</dd>
+                    </div>
+                  )}
+                </dl>
+
+                <div className="flex flex-wrap justify-between gap-3 pt-1">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setStep(0)}
+                    className="text-muted-foreground"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Edit details
+                  </Button>
+                  <form
+                    onSubmit={handleSubmit((data) => placeOrder({ ...data, ...values }))}
+                    className="flex"
+                  >
+                    <Button type="submit" disabled={placing} className="min-w-44 gap-2">
+                      {placing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Placing order…
+                        </>
+                      ) : (
+                        <>
+                          Place order
+                          <Check className="h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <Card>
+            <CardContent className="space-y-4 p-5">
+              <h2 className="font-semibold">Your order</h2>
+              <ul className="space-y-3">
+                {items.map((item) => (
+                  <li key={item.id} className="flex gap-3">
+                    <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                        {item.qty}
+                      </span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm font-medium">{item.title}</p>
+                      <p className="text-xs tabular-nums text-muted-foreground">
+                        {currency(item.price)} each
+                      </p>
+                    </div>
+                    <span className="text-sm font-medium tabular-nums">
+                      {currency(item.price * item.qty)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <Separator />
+
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Subtotal</dt>
+                  <dd className="tabular-nums">{currency(subtotal)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Shipping</dt>
+                  <dd className="tabular-nums">{currency(shipping)}</dd>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-base font-semibold">
+                  <dt>Total</dt>
+                  <dd className="tabular-nums">{currency(total)}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The slot is always present so showing or clearing a message never reflows
+ * the form. A layout shift while the pointer is down cancels the click that
+ * follows mouseup, which used to swallow the "Continue" click.
+ */
+function FieldError({ id, message }) {
+  return (
+    <p
+      id={id}
+      aria-live="polite"
+      className={cn("min-h-4 text-xs text-destructive", !message && "invisible")}
+    >
+      {message ?? "\u00a0"}
+    </p>
+  );
+}
+
+function ChannelCard({ active, onClick, icon: Icon, title, description }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex items-start gap-3 rounded-lg border p-4 text-left transition-all",
+        active
+          ? "border-foreground bg-accent"
+          : "hover:border-muted-foreground/40 hover:bg-accent/50"
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+          active ? "bg-primary text-primary-foreground" : "bg-muted"
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 font-medium">
+          {title}
+          {active && <Check className="h-3.5 w-3.5" />}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+export function CheckoutSteps({ current }) {
+  return (
+    <ol className="flex items-center gap-2 text-sm">
+      {steps.map((step, index) => {
+        const Icon = step.icon;
+        const done = index < current;
+        const active = index === current;
+
+        return (
+          <li key={step.id} className="flex flex-1 items-center gap-2">
+            <span
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-medium transition-colors",
+                active && "border-foreground bg-foreground text-background",
+                done && "border-foreground bg-accent",
+                !active && !done && "text-muted-foreground"
+              )}
+            >
+              {done ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+            </span>
+            <span className={cn("hidden sm:inline", active ? "font-medium" : "text-muted-foreground")}>
+              {step.label}
+            </span>
+            {index < steps.length - 1 && (
+              <span className={cn("ml-1 h-px flex-1", done ? "bg-foreground" : "bg-border")} />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}

@@ -8,11 +8,13 @@ export default function SearchInput({
   setSearch,
   isLoading,
   setPage,
+  placeholder = "Search…",
 }: {
   search: string;
   setSearch: React.Dispatch<React.SetStateAction<string>>;
   isLoading: boolean;
   setPage: React.Dispatch<React.SetStateAction<number>>;
+  placeholder?: string;
 }) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -43,7 +45,7 @@ export default function SearchInput({
           setSearch(e.target.value);
           setPage(1);
         }}
-        placeholder="Search by id..."
+        placeholder={placeholder}
         className="w-full border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 shadow-none h-8 bg-card!"
       />
       {search && (

@@ -1,21 +1,19 @@
-const API_URL = process.env.REACT_APP_API_URL ?? "";
-const ADMIN_KEY = process.env.REACT_APP_ADMIN_KEY ?? "";
+const API_URL = import.meta.env.VITE_API_URL ?? "";
 
-export const request = async (path, options = {}) => {
+export const request = async (url, options = {}) => {
   let response;
 
   try {
-    response = await fetch(`${API_URL}/api${path}`, {
+    response = await fetch(`${API_URL}${url}`, {
       ...options,
       headers: {
         ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-        ...(ADMIN_KEY ? { "x-admin-key": ADMIN_KEY } : {}),
         ...options.headers,
       },
     });
   } catch {
     throw new Error(
-      `Cannot reach the API at ${API_URL || window.location.origin}/api. Is the backend running (cd backend && npm run dev)?`
+      `Cannot reach the API at ${API_URL || window.location.origin}. Is the backend running (cd backend && npm run dev)?`
     );
   }
 
@@ -28,29 +26,22 @@ export const request = async (path, options = {}) => {
   return payload;
 };
 
-export const getProducts = async () => {
-  const data = await request("/products?limit=200");
-  return data.products;
+const toQuery = (params = {}) => {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `?${query}` : "";
 };
 
-export const getProduct = async (id) => {
-  const data = await request(`/products/${id}`);
-  return data.product;
-};
+export const getProducts = ({ q, search, ...rest } = {}) =>
+  request(`/api/products${toQuery({ ...rest, search: search ?? q })}`);
 
-export const getProductsByCategory = async (category, limit = 11) => {
-  const data = await request(
-    `/products?category=${encodeURIComponent(category)}&limit=${limit}`
-  );
-  return data.products;
-};
+export const getProduct = (id) => request(`/api/products/${id}`);
 
-export const getCategories = async () => {
-  const data = await request("/categories");
-  return data.categories;
-};
+export const getProductsByCategory = (category, limit = 30) =>
+  request(`/api/products${toQuery({ category, limit })}`);
 
-export const createProduct = async (product) => {
-  const data = await request("/products", { method: "POST", body: product });
-  return data.product;
-};
+export const getCategories = () => request("/api/categories");

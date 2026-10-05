@@ -5,6 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const navItems = [
   { title: "Overview", url: "/dashboard/overview" },
+  { title: "Products", url: "/dashboard/products" },
 ];
 
 function getTitle(pathname: string) {
