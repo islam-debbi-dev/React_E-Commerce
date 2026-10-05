@@ -2,6 +2,7 @@ import { Router } from "express";
 import productRoutes from "./products.routes.js";
 import categoryRoutes from "./categories.routes.js";
 import orderRoutes from "./orders.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
 import { config, hasTelegram, hasCloudinary } from "../config/env.js";
 import mongoose from "mongoose";
 
@@ -24,5 +25,6 @@ router.get("/health", (req, res) => {
 router.use(categoryRoutes);
 router.use(productRoutes);
 router.use(orderRoutes);
+router.use(analyticsRoutes);
 
 export default router;

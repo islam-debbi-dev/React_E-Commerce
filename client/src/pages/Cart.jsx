@@ -2,11 +2,14 @@ import React from "react";
 import { Footer, Navbar } from "../components";
 import { useSelector, useDispatch } from "react-redux";
 import { addCart, delCart } from "../redux/action";
+import { usePruneCart } from "../hooks/usePruneCart";
 import { Link } from "react-router-dom";
 
 const Cart = () => {
   const state = useSelector((state) => state.handleCart);
   const dispatch = useDispatch();
+
+  usePruneCart(state);
 
   const EmptyCart = () => {
     return (

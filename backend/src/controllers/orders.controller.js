@@ -24,9 +24,14 @@ const normalizeItems = async (rawItems) => {
       throw ApiError.badRequest("every item needs a productId");
     }
 
-    const product = await Product.findById(productId).lean();
+    const product = mongoose.isValidObjectId(productId)
+      ? await Product.findById(productId).lean()
+      : null;
+
     if (!product) {
-      throw ApiError.badRequest(`Product ${productId} no longer exists`);
+      throw ApiError.badRequest(
+        `Product "${productId}" is not in the shop any more, remove it from the cart and try again`
+      );
     }
 
     items.push({
@@ -57,9 +62,18 @@ const readCustomer = (body) => {
   return customer;
 };
 
+const readChannel = (body) => {
+  const channel = String(body.channel ?? "telegram").trim().toLowerCase();
+  if (!["telegram", "whatsapp"].includes(channel)) {
+    throw ApiError.badRequest("channel must be telegram or whatsapp");
+  }
+  return channel;
+};
+
 export const createOrder = asyncHandler(async (req, res) => {
   const customer = readCustomer(req.body);
   const items = await normalizeItems(req.body.items);
+  const channel = readChannel(req.body);
 
   const subtotal = round(items.reduce((sum, item) => sum + item.price * item.qty, 0));
   const shipping = items.length ? config.shippingFlat : 0;
@@ -70,6 +84,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     customer,
     items,
     itemCount,
+    channel,
     subtotal,
     shipping,
     total: round(subtotal + shipping),

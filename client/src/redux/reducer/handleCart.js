@@ -41,6 +41,12 @@ const handleCart = (state = getInitialCart(), action) => {
       localStorage.removeItem("cart");
       return [];
 
+    case "PRUNEITEMS":
+      const stale = new Set(action.payload);
+      updatedCart = state.filter((x) => !stale.has(x.id));
+      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      return updatedCart;
+
     default:
       return state;
   }

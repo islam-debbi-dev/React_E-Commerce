@@ -1,0 +1,14 @@
+# === CONFIG ===
+protected_branch="master" # or "canary", "production", etc.
+
+# === Run checks ===
+bun typecheck
+
+# === Prevent pushing directly to protected branch ===
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/$protected_branch" ]; then
+    echo "🚫 Direct push to '$protected_branch' is blocked."
+    echo "Use a pull request or bypass with 'git push --no-verify'."
+    exit 1
+  fi
+done

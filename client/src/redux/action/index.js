@@ -20,3 +20,11 @@ export const clearCart = () =>{
         type:"CLEARITEM"
     }
 }
+
+// For dropping items that are not in the shop any more
+export const pruneCart = (ids) =>{
+    return {
+        type:"PRUNEITEMS",
+        payload:ids
+    }
+}

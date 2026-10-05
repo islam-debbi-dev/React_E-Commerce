@@ -55,7 +55,8 @@ export const requireAdminKey = (req, res, next) => {
     next();
     return;
   }
-  const provided = req.get("x-admin-key");
+  const bearer = req.get("authorization")?.replace(/^Bearer\s+/i, "");
+  const provided = req.get("x-admin-key") || bearer;
   if (provided !== config.adminKey) {
     next(ApiError.unauthorized());
     return;
